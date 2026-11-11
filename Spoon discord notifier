@@ -1,0 +1,84 @@
+"""
+스푼 방송 시작 -> 디스코드 @everyone 알림
+
+구조
+  1) 일정 간격으로 스푼에서 "이 사람이 지금 방송 중인가?" 확인 (check_spoon_live)
+  2) 새로 방송을 켰으면(이전엔 없던 live_id) 디스코드 웹훅으로 @everyone + 링크 전송
+
+표준 라이브러리만 사용하므로 설치할 패키지 없음.
+실행: python spoon_discord_notifier.py
+"""
+import json
+import time
+import urllib.request
+
+# ===================== 설정 =====================
+DISCORD_WEBHOOK_URL = "여기에_디스코드_웹훅_URL"   # 채널 설정 > 연동 > 웹훅
+SPOON_USER_ID = 0                                  # 감시할 DJ의 스푼 user id (숫자)
+DJ_NAME = "DJ이름"
+POLL_SECONDS = 30                                  # 너무 짧게 하면 차단될 수 있음
+# =================================================
+
+last_notified_live_id = None
+
+
+def check_spoon_live(user_id):
+    """
+    지금 방송 중이면 {"live_id": ..., "title": ...} 반환, 아니면 None.
+
+    ※ 스푼은 공개 공식 API가 없습니다. 이 함수만 실제 스푼 요청 방식에 맞게
+       채워 넣으면 나머지는 그대로 동작합니다.
+       (앱/웹의 네트워크 요청을 확인해 DJ 프로필의 '현재 라이브' 정보를 주는
+        주소를 찾아 연결하세요.)
+    """
+    raise NotImplementedError("스푼 방송 여부 확인 로직을 여기에 구현하세요")
+
+
+def build_live_url(live_id):
+    # 웹 라이브 주소 형식 (실제 링크가 열리는지 한 번 확인해 보세요)
+    return f"https://www.spooncast.net/kr/live/{live_id}"
+
+
+def send_discord(live):
+    url = build_live_url(live["live_id"])
+    title = live.get("title") or ""
+    content = (
+        f"@everyone 🎙️ **{DJ_NAME}** 님이 스푼 방송을 시작했어요!\n"
+        f"{title}\n"
+        f"지금 들으러 오세요 👉 {url}"
+    )
+    body = json.dumps({
+        "content": content,
+        # @everyone 멘션이 실제로 울리도록 허용
+        "allowed_mentions": {"parse": ["everyone"]},
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        DISCORD_WEBHOOK_URL,
+        data=body,
+        headers={"Content-Type": "application/json", "User-Agent": "spoon-notifier"},
+        method="POST",
+    )
+    urllib.request.urlopen(req, timeout=10).read()
+
+
+def main():
+    global last_notified_live_id
+    print("감시 시작...")
+    while True:
+        try:
+            live = check_spoon_live(SPOON_USER_ID)
+            if live and live["live_id"] != last_notified_live_id:
+                send_discord(live)
+                last_notified_live_id = live["live_id"]
+                print("알림 전송:", live["live_id"])
+            elif not live:
+                last_notified_live_id = None  # 방송 종료 -> 다음 방송 때 다시 알림
+        except NotImplementedError:
+            raise
+        except Exception as e:
+            print("오류:", e)
+        time.sleep(POLL_SECONDS)
+
+
+if __name__ == "__main__":
+    main()
