@@ -14,7 +14,8 @@ import time
 import urllib.request
 
 # ===================== 설정 =====================
-DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1570162860448026795/zzMBI-17etn4v4D10oPzhpm2FzhBdBG_keTF_rXKvS_emsW3ZIv7XR04IkGq8tYyUf7p"   # 채널 설정 > 연동 > 웹훅
+import os
+DISCORD_WEBHOOK_URL = os.environ["DISCORD_WEBHOOK_URL"]
 # 감시할 DJ 목록: {스푼 user id(숫자): "표시할 이름"}
 DJS = {
     11111111: "시온",
